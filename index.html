@@ -208,8 +208,7 @@ function gerarPDF() {
 
   const fatorMin = Math.max(0, params.mi - params.desvioMi);
   const fatorMax = params.mi + params.desvioMi;
-  const dMin = Math.max(0, params.marca - 0.1);
-  const dMax = params.marca + 0.1;
+
 
   function verificarPagina(alturaNecessaria = 20) {
     if (y + alturaNecessaria > 280) {
@@ -243,6 +242,21 @@ function gerarPDF() {
     y += 6;
   }
 
+  function linhaCampo(campo, valor) {
+  verificarPagina(8);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text(campo, 15, y);
+
+  const larguraCampo = doc.getTextWidth(campo);
+
+  doc.setFont("helvetica", "normal");
+  doc.text(String(valor), 15 + larguraCampo + 2, y);
+
+  y += 6;
+}
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
   doc.text("Relatório Técnico", 15, y);
@@ -267,8 +281,8 @@ function gerarPDF() {
   verificarPagina(85);
 
   if (formulaImg && formulaImg.complete && formulaImg.naturalWidth > 0) {
-    doc.addImage(formulaImg, "PNG", 25, y, 80, 37.5);
-    y += 82;
+    doc.addImage(formulaImg, "PNG", 50, y, 80, 37.5);
+    y += 40;
   } else {
     linha("V = √(2 × μ × g × d)");
     linha("V = velocidade do veículo");
@@ -285,11 +299,11 @@ function gerarPDF() {
   titulo("2. Dados utilizados no cálculo");
 
   linhaCampo("Distribuição de probabilidade do fator de arrasto:", "Uniforme");
-  linhaCampo("Fator de arrasto mínimo:", miMin.toFixed(3));
-  linhaCampo("Fator de arrasto máximo:", miMax.toFixed(3));
-  linhaCampo("Distribuição de probabilidade da marca de frenagem:", "Uniforme");
-  linhaCampo("Comprimento mínimo da marca:", `${dMin.toFixed(2)} m`);
-  linhaCampo("Comprimento máximo da marca:", `${dMax.toFixed(2)} m`);
+  linhaCampo("Fator de arrasto mínimo:", fatorMin.toFixed(3));
+  linhaCampo("Fator de arrasto máximo:", fatorMax.toFixed(3));
+  linhaCampo("Distribuição de probabilidade da marca de frenagem:", "Normal");
+  linhaCampo("Comprimento médio da marca:", `${params.marca.toFixed(2)} m`);
+  linhaCampo("Desvio padrão da marca:", "0,10 m"); 
   linhaCampo("Latitude considerada:", `${params.latitudeGraus.toFixed(6)}°`);
   linhaCampo("Aceleração da gravidade:", `${r.gravidadeLocalMs2.toFixed(6)} m/s²`);;
   linhaCampo("Número de simulações:", "10.000");
@@ -302,14 +316,22 @@ function gerarPDF() {
   linhaCampo( "Faixa contendo 95% das velocidades simuladas:", `${r.intervalo95Kmh[0].toFixed(2)} km/h a ${r.intervalo95Kmh[1].toFixed(2)} km/h`);
   y += 4;
 
-  const canvas = document.getElementById("histograma");
+  
+const canvas = document.getElementById("histograma");
 
-  if (canvas) {
-    verificarPagina(100);
-    const imagemHistograma = canvas.toDataURL("image/png");
-    doc.addImage(imagemHistograma, "PNG", 15, y, 180, 90);
-    y += 98;
-  }
+if (canvas) {
+  desenharHistograma(
+    r.velocidades,
+    r.velocidadeMaisProvavelMs,
+    r.intervalo95Ms[0],
+    r.intervalo95Ms[1]
+  );
+
+  verificarPagina(100);
+  const imagemHistograma = canvas.toDataURL("image/png");
+  doc.addImage(imagemHistograma, "PNG", 15, y, 180, 90);
+  y += 98;
+}
 
   titulo("4. Percentis escolhidos");
 
@@ -343,6 +365,18 @@ function gravidadeLatitude(latitudeGraus) {
   return 9.780327 * (1 + 0.0053024 * sin2 - 0.0000058 * sin2_2phi);
 }
 
+function normalAleatorio(media, desvioPadrao) {
+  let u1 = 0;
+  let u2 = 0;
+
+  while (u1 === 0) u1 = Math.random();
+  while (u2 === 0) u2 = Math.random();
+
+  const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+
+  return media + z * desvioPadrao;
+}
+
 
 function velocidadeMonteCarlo(params) {
   const g = gravidadeLatitude(params.latitudeGraus);
@@ -350,15 +384,19 @@ function velocidadeMonteCarlo(params) {
   const miMin = Math.max(0, params.mi - params.desvioMi);
   const miMax = params.mi + params.desvioMi;
 
-  const dMin = Math.max(0, params.marca - 0.1);
-  const dMax = params.marca + 0.1;
+  const desvioMarca = 0.10;
 
   const n = 10000;
   const velocidades = [];
 
   for (let i = 0; i < n; i++) {
     const miSorteado = miMin + Math.random() * (miMax - miMin);
-    const dSorteado = dMin + Math.random() * (dMax - dMin);
+
+    let dSorteado = normalAleatorio(params.marca, desvioMarca);
+
+    if (dSorteado < 0) {
+      dSorteado = 0;
+    }
 
     const v = Math.sqrt(2 * miSorteado * g * dSorteado);
 
@@ -377,7 +415,6 @@ function velocidadeMonteCarlo(params) {
   const p2_5 = velocidades[Math.floor(0.025 * n)];
   const p97_5 = velocidades[Math.floor(0.975 * n)];
 
-  
   return {
     velocidadeMaisProvavelMs: media,
     velocidadeMaisProvavelKmh: media * 3.6,
@@ -388,8 +425,6 @@ function velocidadeMonteCarlo(params) {
     gravidadeLocalMs2: g,
     velocidades: velocidades
   };
-
-  
 }
 
 function desenharHistograma(velocidades, media, limiteInferior, limiteSuperior) {
@@ -564,4 +599,3 @@ function calcular() {
 </body>
 
 </html>
-
