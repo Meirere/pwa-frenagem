@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Velocidade pela Marca de frenagem</title>
+
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1f2f46">
+
+  <script src="jspdf.min.js"></script>
+
+  <style>
+
+canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background: #f2f2f2;
+  margin: 0;
+  padding: 0;
+}
+
+main {
+  max-width: 900px;
+  margin: auto;
+  padding: 20px;
+}
+
+h1 {
+  color: #790404;
+}
+
+.card {
+  background: white;
+  padding: 20px;
+  margin-top: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px #0002;
+}
+
+label {
+  display: block;
+  margin-top: 12px;
+  font-weight: bold;
+}
+
+input {
+  width: 100%;
+  padding: 8px;
+  margin-top: 4px;
+  box-sizing: border-box;
+}
+
+button {
+  margin-top: 20px;
+  padding: 12px;
+  width: 100%;
+  background: #bb8000;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #036600;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+
+th, td {
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: center;
+}
+
+th {
+  background: #072d64;
+  color: white;
+}
+
+footer {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+  font-size: 14px;
+}
+
+  </style>
+</head>
+
+
+
+<body>
+  <img id="formulaModelo" src="formula_frenagem.png" style="display:none;">
+
+  <!--
+  #####################################
+  ##########PARÂMETROS################# 
+  #####################################
+   -->
+
+  <main>
+    <h1>Velocidade pela marca de frenagem</h1>
+    <p>PWA offline cálculo de velocidade pelo comprimento da marca de frenagem aplicando Método de Monte Carlo para tratamento estatístico</p>
+
+    <section class="card">
+      <h2>Parâmetros</h2>
+
+      <label>Comprimento da marca de frenagem (m)</label>
+      <input id="marca" type="number" value="30" step="0.01">
+
+      <label>Coeficiente de atrito</label>
+      <input id="mi" type="number" value="0.7" step="0.01">
+
+      <label>Desvio padrão do coeficiente de atrito</label>
+      <input id="desvioMi" type="number" value="0.05" step="0.001">
+
+      <label>Latitude (graus)</label>
+      <input id="latitude" type="number" value="-8.032198" step="0.000001">
+
+      <label>Longitude (graus)</label>
+      <input id="longitude" type="number" value="-34.918262" step="0.000001">
+
+      <!--
+      <label>Altura provável da boca da arma (m)</label>
+      <input id="alturaBoca" type="number" value="1.40" step="0.01">
+
+       <label>Velocidade de impacto estimada (m/s)</label>
+      <input id="velocidadeImpacto" type="number" value="180" step="0.1">
+
+      -->
+      
+
+      <button onclick="calcular()">Calcular velocidade</button>
+      <button onclick="gerarPDF()">Gerar relatório PDF</button>
+    </section>
+
+    <section class="card">
+      <h2>Resultados</h2>
+      <div id="resultado"></div>
+      <canvas id="histograma" width="800" height="400"></canvas>
+    </section>
+  </main>
+
+<footer>
+  © Perito Meirere
+</footer>
+
+
+<script>
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js");
+}
+
+function grausParaRad(graus) {
+  return graus * Math.PI / 180;
+}
+
+function gerarPDF() {
+  const params = {
+    marca: valor("marca"),
+    mi: valor("mi"),
+    desvioMi: valor("desvioMi"),
+    latitudeGraus: valor("latitude"),
+    longitudeGraus: valor("longitude")
+  };
+
+  if (
+    isNaN(params.marca) ||
+    isNaN(params.mi) ||
+    isNaN(params.desvioMi) ||
+    isNaN(params.latitudeGraus)
+  ) {
+    alert("Preencha corretamente todos os campos numéricos.");
+    return;
+  }
+
+  const r = velocidadeMonteCarlo(params);
+
+  if (!r) {
+    alert("Não foi possível calcular. Verifique os dados informados.");
+    return;
+  }
+
+  let doc;
+
+  if (window.jspdf && window.jspdf.jsPDF) {
+    doc = new window.jspdf.jsPDF();
+  } else if (window.jsPDF) {
+    doc = new window.jsPDF();
+  } else {
+    alert("A biblioteca jsPDF não foi carregada corretamente.");
+    return;
+  }
+
+  let y = 15;
+
+  const fatorMin = Math.max(0, params.mi - params.desvioMi);
+  const fatorMax = params.mi + params.desvioMi;
+  const dMin = Math.max(0, params.marca - 1);
+  const dMax = params.marca + 1;
+
+  function verificarPagina(alturaNecessaria = 20) {
+    if (y + alturaNecessaria > 280) {
+      doc.addPage();
+      y = 15;
+    }
+  }
+
+  function titulo(texto) {
+    verificarPagina(15);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.text(texto, 15, y);
+    y += 8;
+  }
+
+  function paragrafo(texto) {
+    verificarPagina(25);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const linhas = doc.splitTextToSize(texto, 180);
+    doc.text(linhas, 15, y);
+    y += linhas.length * 5 + 4;
+  }
+
+  function linha(texto) {
+    verificarPagina(8);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(texto, 15, y);
+    y += 6;
+  }
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.text("Relatório Técnico", 15, y);
+  y += 8;
+
+  doc.setFontSize(12);
+  doc.text("Velocidade pela Marca de Frenagem", 15, y);
+  y += 12;
+
+  titulo("1. Modelo matemático");
+
+  paragrafo(
+    "A velocidade inicial do veículo foi estimada a partir do comprimento da marca de frenagem, empregando-se modelo físico baseado na Segunda Lei de Newton e no Princípio Trabalho-Energia."
+  );
+
+  paragrafo(
+    "Admitindo frenagem com desaceleração aproximadamente constante, a velocidade foi calculada pela expressão abaixo:"
+  );
+
+  const formulaImg = document.getElementById("formulaModelo");
+
+  verificarPagina(85);
+
+  if (formulaImg && formulaImg.complete && formulaImg.naturalWidth > 0) {
+    doc.addImage(formulaImg, "PNG", 25, y, 160, 75);
+    y += 82;
+  } else {
+    linha("V = √(2 × μ × g × d)");
+    linha("V = velocidade do veículo");
+    linha("μ = fator de arrasto pneu/pavimento");
+    linha("g = aceleração local da gravidade");
+    linha("d = comprimento da marca de frenagem");
+    y += 4;
+  }
+
+  paragrafo(
+    "Para propagação das incertezas dos parâmetros de entrada, foi empregado o Método de Monte Carlo, mediante geração aleatória de 10.000 simulações independentes."
+  );
+
+  titulo("2. Dados utilizados no cálculo");
+
+  linha("Distribuição de probabilidade do fator de arrasto: uniforme");
+  linha(`Fator de arrasto mínimo: ${fatorMin.toFixed(3)}`);
+  linha(`Fator de arrasto máximo: ${fatorMax.toFixed(3)}`);
+  linha("Distribuição de probabilidade da marca de frenagem: uniforme");
+  linha(`Comprimento mínimo da marca: ${dMin.toFixed(2)} m`);
+  linha(`Comprimento máximo da marca: ${dMax.toFixed(2)} m`);
+  linha(`Latitude considerada: ${params.latitudeGraus.toFixed(6)} graus`);
+  linha(`Aceleração da gravidade: ${r.gravidadeLocalMs2.toFixed(6)} m/s²`);
+  linha("Número de simulações: 10.000");
+  y += 4;
+
+  titulo("3. Resultados");
+
+  linha(`Velocidade mais provável: ${r.velocidadeMaisProvavelKmh.toFixed(2)} km/h`);
+  linha(`Desvio padrão: ${r.desvioPadraoKmh.toFixed(2)} km/h`);
+  linha(
+    `Faixa contendo 95% das velocidades simuladas: ${r.intervalo95Kmh[0].toFixed(2)} km/h a ${r.intervalo95Kmh[1].toFixed(2)} km/h`
+  );
+  y += 4;
+
+  const canvas = document.getElementById("histograma");
+
+  if (canvas) {
+    verificarPagina(100);
+    const imagemHistograma = canvas.toDataURL("image/png");
+    doc.addImage(imagemHistograma, "PNG", 15, y, 180, 90);
+    y += 98;
+  }
+
+  titulo("4. Percentis escolhidos");
+
+  paragrafo(
+    "Foram adotados os percentis 2,5% e 97,5%, delimitando a faixa central correspondente a aproximadamente 95% das velocidades simuladas. Assim, cerca de 5% das simulações permaneceram fora desse intervalo."
+  );
+
+  titulo("5. Observação");
+
+  paragrafo(
+    "Os resultados obtidos apresentam distribuição aproximadamente normal. Portanto, o valor mais provável foi adotado como o valor médio das velocidades simuladas, enquanto os limites inferior e superior representam os percentis selecionados da distribuição."
+  );
+
+  paragrafo(
+    "Os resultados dependem diretamente das hipóteses adotadas e dos parâmetros inseridos pelo usuário, especialmente do fator de arrasto e do comprimento da marca de frenagem. Cabe ao usuário do aplicativo a responsabilidade pela correta inserção dos dados, bem como pela avaliação da adequação do modelo físico ao caso concreto."
+  );
+
+  paragrafo(
+    "O presente relatório constitui ferramenta de apoio ao cálculo pericial e não substitui a análise técnico-pericial completa do evento."
+  );
+
+  doc.save("relatorio_velocidade_frenagem.pdf");
+}
+
+
+function gravidadeLatitude(latitudeGraus) {
+  const phi = grausParaRad(latitudeGraus);
+  const sin2 = Math.sin(phi) ** 2;
+  const sin2_2phi = Math.sin(2 * phi) ** 2;
+
+  return 9.780327 * (1 + 0.0053024 * sin2 - 0.0000058 * sin2_2phi);
+}
+
+
+function velocidadeMonteCarlo(params) {
+  const g = gravidadeLatitude(params.latitudeGraus);
+
+  const miMin = Math.max(0, params.mi - params.desvioMi);
+  const miMax = params.mi + params.desvioMi;
+
+  const dMin = Math.max(0, params.marca - 1);
+  const dMax = params.marca + 1;
+
+  const n = 10000;
+  const velocidades = [];
+
+  for (let i = 0; i < n; i++) {
+    const miSorteado = miMin + Math.random() * (miMax - miMin);
+    const dSorteado = dMin + Math.random() * (dMax - dMin);
+
+    const v = Math.sqrt(2 * miSorteado * g * dSorteado);
+
+    velocidades.push(v);
+  }
+
+  velocidades.sort((a, b) => a - b);
+
+  const media = velocidades.reduce((soma, v) => soma + v, 0) / n;
+
+  const variancia =
+    velocidades.reduce((soma, v) => soma + (v - media) ** 2, 0) / (n - 1);
+
+  const desvioPadrao = Math.sqrt(variancia);
+
+  const p2_5 = velocidades[Math.floor(0.025 * n)];
+  const p97_5 = velocidades[Math.floor(0.975 * n)];
+
+  
+  return {
+    velocidadeMaisProvavelMs: media,
+    velocidadeMaisProvavelKmh: media * 3.6,
+    desvioPadraoMs: desvioPadrao,
+    desvioPadraoKmh: desvioPadrao * 3.6,
+    intervalo95Ms: [p2_5, p97_5],
+    intervalo95Kmh: [p2_5 * 3.6, p97_5 * 3.6],
+    gravidadeLocalMs2: g,
+    velocidades: velocidades
+  };
+
+  
+}
+
+function desenharHistograma(velocidades, media, limiteInferior, limiteSuperior) {
+  const canvas = document.getElementById("histograma");
+  const ctx = canvas.getContext("2d");
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const dados = velocidades.map(v => v * 3.6); // km/h
+  const min = Math.min(...dados);
+  const max = Math.max(...dados);
+
+  const classes = 60;
+  const larguraClasse = (max - min) / classes;
+  const frequencias = Array(classes).fill(0);
+
+  dados.forEach(v => {
+    let indice = Math.floor((v - min) / larguraClasse);
+    if (indice >= classes) indice = classes - 1;
+    frequencias[indice]++;
+  });
+
+  const margemEsq = 55;
+  const margemDir = 25;
+  const margemSup = 25;
+  const margemInf = 55;
+
+  const larguraGrafico = canvas.width - margemEsq - margemDir;
+  const alturaGrafico = canvas.height - margemSup - margemInf;
+
+  const maxFreq = Math.max(...frequencias);
+
+  // eixos
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(margemEsq, margemSup);
+  ctx.lineTo(margemEsq, margemSup + alturaGrafico);
+  ctx.lineTo(margemEsq + larguraGrafico, margemSup + alturaGrafico);
+  ctx.stroke();
+
+  // barras
+  ctx.fillStyle = "#072d64"; 
+  for (let i = 0; i < classes; i++) {
+    const x = margemEsq + i * (larguraGrafico / classes);
+    const h = (frequencias[i] / maxFreq) * alturaGrafico;
+    const y = margemSup + alturaGrafico - h;
+
+    
+    ctx.fillRect(x, y, larguraGrafico / classes - 2, h);
+  }
+
+  function escalaX(valor) {
+    return margemEsq + ((valor - min) / (max - min)) * larguraGrafico;
+  }
+
+  function linhaVertical(valor, texto, cor) {
+
+    const x = escalaX(valor);
+
+    // Descobre em qual barra o valor caiu
+    let indice = Math.floor((valor - min) / larguraClasse);
+    if (indice >= classes) indice = classes - 1;
+    if (indice < 0) indice = 0;
+
+    // altura da barra
+    const h = (frequencias[indice] / maxFreq) * alturaGrafico;
+
+    const yBarra = margemSup + alturaGrafico - h;
+
+    ctx.strokeStyle = cor;
+    ctx.lineWidth = 2;
+
+ctx.beginPath();
+ctx.moveTo(x, yBarra - 10);
+ctx.lineTo(x, yBarra);
+ctx.stroke();
+
+    ctx.fillStyle = cor;
+    ctx.textAlign = "center";
+    ctx.fillText(texto, x, margemSup + alturaGrafico + 30);
+}
+linhaVertical(
+    media * 3.6,
+    `${(media * 3.6).toFixed(2)}`,
+    "#036600"          // verde
+);
+
+linhaVertical(
+    limiteInferior * 3.6,
+    `${(limiteInferior * 3.6).toFixed(2)}`,
+    "#d32f2f"          // vermelho
+);
+
+linhaVertical(
+    limiteSuperior * 3.6,
+    `${(limiteSuperior * 3.6).toFixed(2)}`,
+    "#d32f2f"          // vermelho
+);
+
+  ctx.fillStyle = "#000000";
+  ctx.fillText("Velocidade (km/h)", margemEsq + larguraGrafico / 2 - 60, canvas.height - 10);
+  ctx.fillText("Frequência", 10, margemSup + 10);
+  
+}
+
+
+function valor(id) {
+  return parseFloat(document.getElementById(id).value);
+}
+
+function calcular() {
+  const params = {
+    marca: valor("marca"),
+    mi: valor("mi"),
+    desvioMi: valor("desvioMi"),
+    latitudeGraus: valor("latitude"),
+    longitudeGraus: valor("longitude")
+  };
+
+  if (
+  isNaN(params.marca) ||
+  isNaN(params.mi) ||
+  isNaN(params.desvioMi) ||
+  isNaN(params.latitudeGraus)
+) {
+  document.getElementById("resultado").innerHTML =
+    "<p>Preencha corretamente todos os campos numéricos.</p>";
+  return;
+}
+
+  const r = velocidadeMonteCarlo(params);
+
+  if (!r) {
+  document.getElementById("resultado").innerHTML =
+    "<p>Não foi possível calcular. Verifique o coeficiente de atrito e o desvio informado.</p>";
+  return;
+}
+
+  let html = `
+  <h3>Resultado por Monte Carlo</h3>
+  <p><strong>Velocidade mais provável:</strong> ${r.velocidadeMaisProvavelKmh.toFixed(2)} km/h</p>
+  <p><strong>Desvio padrão:</strong> ${r.desvioPadraoKmh.toFixed(2)} km/h</p>
+  <p><strong>Faixa contendo 95% das velocidades simuladas:</strong> ${r.intervalo95Kmh[0].toFixed(2)} km/h a ${r.intervalo95Kmh[1].toFixed(2)} km/h</p>
+  <p><strong>Gravidade local:</strong> ${r.gravidadeLocalMs2.toFixed(6)} m/s²</p>
+  <p><strong>Análise técnica:</strong> Considerando as hipóteses adotadas para os parâmetros de entrada e as 10.000 simulações de Monte Carlo, aproximadamente 95% das velocidades simuladas encontram-se compreendidas entre ${r.intervalo95Kmh[0].toFixed(2)} km/h e ${r.intervalo95Kmh[1].toFixed(2)} km/h, permanecendo cerca de 5% das simulações fora desse intervalo.</p>
+
+  `;
+
+  document.getElementById("resultado").innerHTML = html;
+
+  desenharHistograma(
+  r.velocidades,
+  r.velocidadeMaisProvavelMs,
+  r.intervalo95Ms[0],
+  r.intervalo95Ms[1]
+);
+
+
+}
+
+
+</script>
+
+</body>
+
+</html>
+
