@@ -281,8 +281,8 @@ function gerarPDF() {
   verificarPagina(85);
 
   if (formulaImg && formulaImg.complete && formulaImg.naturalWidth > 0) {
-    doc.addImage(formulaImg, "PNG", 50, y, 80, 37.5);
-    y += 40;
+    doc.addImage(formulaImg, "PNG", 60, y, 80, 37.5);
+    y += 44;
   } else {
     linha("V = √(2 × μ × g × d)");
     linha("V = velocidade do veículo");
@@ -303,7 +303,7 @@ function gerarPDF() {
   linhaCampo("Fator de arrasto máximo:", fatorMax.toFixed(3));
   linhaCampo("Distribuição de probabilidade da marca de frenagem:", "Normal");
   linhaCampo("Comprimento médio da marca:", `${params.marca.toFixed(2)} m`);
-  linhaCampo("Desvio padrão da marca:", "0,10 m"); 
+  linhaCampo("Desvio padrão da marca:", "1,0 m"); 
   linhaCampo("Latitude considerada:", `${params.latitudeGraus.toFixed(6)}°`);
   linhaCampo("Aceleração da gravidade:", `${r.gravidadeLocalMs2.toFixed(6)} m/s²`);;
   linhaCampo("Número de simulações:", "10.000");
@@ -384,7 +384,7 @@ function velocidadeMonteCarlo(params) {
   const miMin = Math.max(0, params.mi - params.desvioMi);
   const miMax = params.mi + params.desvioMi;
 
-  const desvioMarca = 0.10;
+  const desvioMarca = 1;
 
   const n = 10000;
   const velocidades = [];
