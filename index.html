@@ -208,8 +208,8 @@ function gerarPDF() {
 
   const fatorMin = Math.max(0, params.mi - params.desvioMi);
   const fatorMax = params.mi + params.desvioMi;
-  const dMin = Math.max(0, params.marca - 1);
-  const dMax = params.marca + 1;
+  const dMin = Math.max(0, params.marca - 0.1);
+  const dMax = params.marca + 0.1;
 
   function verificarPagina(alturaNecessaria = 20) {
     if (y + alturaNecessaria > 280) {
@@ -352,8 +352,8 @@ function velocidadeMonteCarlo(params) {
   const miMin = Math.max(0, params.mi - params.desvioMi);
   const miMax = params.mi + params.desvioMi;
 
-  const dMin = Math.max(0, params.marca - 1);
-  const dMax = params.marca + 1;
+  const dMin = Math.max(0, params.marca - 0.1);
+  const dMax = params.marca + 0.1;
 
   const n = 10000;
   const velocidades = [];
