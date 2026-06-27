@@ -116,14 +116,36 @@ footer {
     <section class="card">
       <h2>Parâmetros</h2>
 
-      <label>Comprimento da marca de frenagem (m)</label>
-      <input id="marca" type="number" value="30" step="0.01">
 
-      <label>Coeficiente de atrito</label>
-      <input id="mi" type="number" value="0.7" step="0.01">
+      
 
-      <label>Desvio padrão do coeficiente de atrito</label>
-      <input id="desvioMi" type="number" value="0.05" step="0.001">
+      
+      <label>Distribuição da marca</label>
+        <select id="tipoMarca" onchange="atualizarCamposMarca()">
+          <option value="normal">Distribuição Normal</option>
+          <option value="uniforme">Distribuição Uniforme</option>
+        </select>
+
+      <div id="camposMarca"></div>
+    
+      <label>Distribuição do fator de arrasto</label>
+        <select id="tipoFator" onchange="atualizarCamposFator()">
+          <option value="normal">Distribuição Normal</option>
+          <option value="uniforme">Distribuição Uniforme</option>
+        </select>
+
+      <div id="camposFator"></div>
+
+      <label>Topografia da via</label>
+        <select id="tipoTopografia" onchange="atualizarCamposTopografia()">
+          <option value="plana">Plana</option>
+          <option value="aclive">Aclive</option>
+          <option value="declive">Declive</option>
+        </select>
+
+      <div id="camposTopografia"></div>
+
+
 
       <label>Latitude (graus)</label>
       <input id="latitude" type="number" value="-8.032198" step="0.000001">
@@ -131,15 +153,10 @@ footer {
       <label>Longitude (graus)</label>
       <input id="longitude" type="number" value="-34.918262" step="0.000001">
 
-      <!--
-      <label>Altura provável da boca da arma (m)</label>
-      <input id="alturaBoca" type="number" value="1.40" step="0.01">
-
-       <label>Velocidade de impacto estimada (m/s)</label>
-      <input id="velocidadeImpacto" type="number" value="180" step="0.1">
-
-      -->
       
+      
+      
+         
 
       <button onclick="calcular()">Calcular velocidade</button>
       <button onclick="gerarPDF()">Gerar relatório PDF</button>
@@ -163,26 +180,142 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js");
 }
 
+window.onload = function () {
+    atualizarCamposMarca();
+    atualizarCamposFator();
+    atualizarCamposTopografia();
+};
+
+function valor(id) {
+  return parseFloat(document.getElementById(id).value);
+}
+
 function grausParaRad(graus) {
   return graus * Math.PI / 180;
 }
 
+function atualizarCamposTopografia() {
+
+  const tipo = document.getElementById("tipoTopografia").value;
+  const div = document.getElementById("camposTopografia");
+
+  if (tipo === "plana") {
+    div.innerHTML = `
+      <p><strong>Inclinação considerada:</strong> 0°</p>
+    `;
+  } else {
+    div.innerHTML = `
+      <label>Inclinação média da via (graus)</label>
+      <input id="anguloVia" type="number" value="5" step="0.1">
+
+      <p>Será adotada distribuição uniforme com variação de ±1°.</p>
+    `;
+  }
+}
+
+function atualizarCamposMarca() {
+
+    const tipoMarca = document.getElementById("tipoMarca").value;
+    const div = document.getElementById("camposMarca");
+
+    if (tipoMarca === "uniforme") {
+
+        div.innerHTML = `
+            <label>Comprimento mínimo da marca (m)</label>
+            <input id="marcaMin" type="number" value="29" step="0.01">
+
+            <label>Comprimento máximo da marca (m)</label>
+            <input id="marcaMax" type="number" value="31" step="0.01">
+        `;
+
+    } else {
+
+        div.innerHTML = `
+            <label>Comprimento da marca (m)</label>
+            <input id="marca" type="number" value="30" step="0.01">
+
+            <label>Desvio padrão (m)</label>
+            <input id="desvioMarca" type="number" value="1" step="0.01">
+        `;
+
+    }
+
+}
+
+function atualizarCamposFator() {
+
+    const tipo = document.getElementById("tipoFator").value;
+    const div = document.getElementById("camposFator");
+
+    if (tipo === "uniforme") {
+
+        div.innerHTML = `
+            <label>Fator de arrasto mínimo</label>
+            <input id="miMin" type="number" value="0.65" step="0.01">
+
+            <label>Fator de arrasto máximo</label>
+            <input id="miMax" type="number" value="0.75" step="0.01">
+        `;
+
+    } else {
+
+        div.innerHTML = `
+            <label>Fator de arrasto médio</label>
+            <input id="mi" type="number" value="0.70" step="0.01">
+
+            <label>Desvio padrão</label>
+            <input id="desvioMi" type="number" value="0.05" step="0.001">
+        `;
+
+    }
+
+}
+
+function sortearAnguloTopografia() {
+
+  const tipo = document.getElementById("tipoTopografia").value;
+
+  if (tipo === "plana") {
+    return 0;
+  }
+
+  const anguloMedio = valor("anguloVia");
+
+  const anguloMin = anguloMedio - 1;
+  const anguloMax = anguloMedio + 1;
+
+  return anguloMin + Math.random() * (anguloMax - anguloMin);
+}
+
 function gerarPDF() {
+
+  const tipoMarca = document.getElementById("tipoMarca").value;
+  const tipoFator = document.getElementById("tipoFator").value;
+  const tipoTopografia = document.getElementById("tipoTopografia").value;
+
   const params = {
-    marca: valor("marca"),
-    mi: valor("mi"),
-    desvioMi: valor("desvioMi"),
+    tipoMarca: tipoMarca,
+    tipoFator: tipoFator,
+    tipoTopografia: tipoTopografia,
+
     latitudeGraus: valor("latitude"),
-    longitudeGraus: valor("longitude")
+    longitudeGraus: valor("longitude"),
+
+    marca: document.getElementById("marca") ? valor("marca") : null,
+    desvioMarca: document.getElementById("desvioMarca") ? valor("desvioMarca") : null,
+    marcaMin: document.getElementById("marcaMin") ? valor("marcaMin") : null,
+    marcaMax: document.getElementById("marcaMax") ? valor("marcaMax") : null,
+
+    mi: document.getElementById("mi") ? valor("mi") : null,
+    desvioMi: document.getElementById("desvioMi") ? valor("desvioMi") : null,
+    miMin: document.getElementById("miMin") ? valor("miMin") : null,
+    miMax: document.getElementById("miMax") ? valor("miMax") : null,
+
+    anguloVia: document.getElementById("anguloVia") ? valor("anguloVia") : 0
   };
 
-  if (
-    isNaN(params.marca) ||
-    isNaN(params.mi) ||
-    isNaN(params.desvioMi) ||
-    isNaN(params.latitudeGraus)
-  ) {
-    alert("Preencha corretamente todos os campos numéricos.");
+  if (isNaN(params.latitudeGraus)) {
+    alert("Preencha corretamente a latitude.");
     return;
   }
 
@@ -195,56 +328,51 @@ function gerarPDF() {
 
   let doc;
 
-  if (window.jspdf && window.jspdf.jsPDF) {
-    doc = new window.jspdf.jsPDF();
-  } else if (window.jsPDF) {
-    doc = new window.jsPDF();
-  } else {
-    alert("A biblioteca jsPDF não foi carregada corretamente.");
-    return;
+if (window.jspdf && window.jspdf.jsPDF) {
+  doc = new window.jspdf.jsPDF();
+} else if (window.jsPDF) {
+  doc = new window.jsPDF();
+} else {
+  alert("A biblioteca jsPDF não foi carregada corretamente.");
+  return;
+}
+
+let y = 15;
+
+function verificarPagina(alturaNecessaria = 20) {
+  if (y + alturaNecessaria > 280) {
+    doc.addPage();
+    y = 15;
   }
+}
 
-  let y = 15;
+function titulo(texto) {
+  verificarPagina(15);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text(texto, 15, y);
+  y += 8;
+}
 
-  const fatorMin = Math.max(0, params.mi - params.desvioMi);
-  const fatorMax = params.mi + params.desvioMi;
+function paragrafo(texto) {
+  verificarPagina(25);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const linhas = doc.splitTextToSize(texto, 180);
+  doc.text(linhas, 15, y);
+  y += linhas.length * 5 + 4;
+}
 
-
-  function verificarPagina(alturaNecessaria = 20) {
-    if (y + alturaNecessaria > 280) {
-      doc.addPage();
-      y = 15;
-    }
-  }
-
-  function titulo(texto) {
-    verificarPagina(15);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(13);
-    doc.text(texto, 15, y);
-    y += 8;
-  }
-
-  function paragrafo(texto) {
-    verificarPagina(25);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    const linhas = doc.splitTextToSize(texto, 180);
-    doc.text(linhas, 15, y);
-    y += linhas.length * 5 + 4;
-  }
-
-  function linha(texto) {
-    verificarPagina(8);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(texto, 15, y);
-    y += 6;
-  }
-
-  function linhaCampo(campo, valor) {
+function linha(texto) {
   verificarPagina(8);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(texto, 15, y);
+  y += 6;
+}
 
+function linhaCampo(campo, valor) {
+  verificarPagina(8);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.text(campo, 15, y);
@@ -257,16 +385,7 @@ function gerarPDF() {
   y += 6;
 }
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
-  doc.text("Relatório Técnico", 15, y);
-  y += 8;
-
-  doc.setFontSize(12);
-  doc.text("Velocidade pela Marca de Frenagem", 15, y);
-  y += 12;
-
-  titulo("1. Modelo matemático");
+titulo("1. Modelo matemático");
 
   paragrafo(
     "A velocidade inicial do veículo foi estimada a partir do comprimento da marca de frenagem, empregando-se modelo físico baseado na Segunda Lei de Newton e pelo Teorema da energia cinética."
@@ -281,14 +400,17 @@ function gerarPDF() {
   verificarPagina(85);
 
   if (formulaImg && formulaImg.complete && formulaImg.naturalWidth > 0) {
-    doc.addImage(formulaImg, "PNG", 60, y, 80, 37.5);
+    doc.addImage(formulaImg, "PNG", 60, y, 80, 50);
     y += 44;
   } else {
-    linha("V = √(2 × μ × g × d)");
+    linha("V = √(2 × g × d × (μ × cosθ ± senθ))");
     linha("V = velocidade do veículo");
     linha("μ = fator de arrasto pneu/pavimento");
     linha("g = aceleração local da gravidade");
     linha("d = comprimento da marca de frenagem");
+    linha("+ para aclive");
+    linha("- para declive");
+    linha("θ = 0° para via plana");
     y += 4;
   }
 
@@ -296,18 +418,74 @@ function gerarPDF() {
     "Para propagação das incertezas dos parâmetros de entrada, foi empregado o Método de Monte Carlo, mediante geração aleatória de 10.000 simulações independentes."
   );
 
-  titulo("2. Dados utilizados no cálculo");
+  
 
-  linhaCampo("Distribuição de probabilidade do fator de arrasto:", "Uniforme");
-  linhaCampo("Fator de arrasto mínimo:", fatorMin.toFixed(3));
-  linhaCampo("Fator de arrasto máximo:", fatorMax.toFixed(3));
-  linhaCampo("Distribuição de probabilidade da marca de frenagem:", "Normal");
+titulo("2. Dados utilizados no cálculo");
+
+// Fator de arrasto
+if (params.tipoFator === "normal") {
+
+  linhaCampo("Distribuição do fator de arrasto:", "Normal");
+  linhaCampo("Fator de arrasto médio:", params.mi.toFixed(3));
+  linhaCampo("Desvio padrão do fator:", params.desvioMi.toFixed(3));
+
+} else {
+
+  linhaCampo("Distribuição do fator de arrasto:", "Uniforme");
+  linhaCampo("Fator de arrasto mínimo:", params.miMin.toFixed(3));
+  linhaCampo("Fator de arrasto máximo:", params.miMax.toFixed(3));
+
+}
+
+// Marca de frenagem
+if (params.tipoMarca === "normal") {
+
+  linhaCampo("Distribuição da marca de frenagem:", "Normal");
   linhaCampo("Comprimento médio da marca:", `${params.marca.toFixed(2)} m`);
-  linhaCampo("Desvio padrão da marca:", "1,0 m"); 
-  linhaCampo("Latitude considerada:", `${params.latitudeGraus.toFixed(6)}°`);
-  linhaCampo("Aceleração da gravidade:", `${r.gravidadeLocalMs2.toFixed(6)} m/s²`);;
-  linhaCampo("Número de simulações:", "10.000");
-  y += 4;
+  linhaCampo("Desvio padrão da marca:", `${params.desvioMarca.toFixed(2)} m`);
+
+} else {
+
+  linhaCampo("Distribuição da marca de frenagem:", "Uniforme");
+  linhaCampo("Comprimento mínimo da marca:", `${params.marcaMin.toFixed(2)} m`);
+  linhaCampo("Comprimento máximo da marca:", `${params.marcaMax.toFixed(2)} m`);
+
+}
+
+// Topografia
+if (params.tipoTopografia === "plana") {
+
+  linhaCampo("Topografia da via:", "Plana");
+  linhaCampo("Inclinação considerada:", "0°");
+
+} else if (params.tipoTopografia === "aclive") {
+
+  linhaCampo("Topografia da via:", "Aclive");
+  linhaCampo("Inclinação média:", `${params.anguloVia.toFixed(1)}°`);
+  linhaCampo(
+    "Distribuição da inclinação:",
+    `Uniforme (${(params.anguloVia - 1).toFixed(1)}° a ${(params.anguloVia + 1).toFixed(1)}°)`
+  );
+
+} else {
+
+  linhaCampo("Topografia da via:", "Declive");
+  linhaCampo("Inclinação média:", `${params.anguloVia.toFixed(1)}°`);
+  linhaCampo(
+    "Distribuição da inclinação:",
+    `Uniforme (${(params.anguloVia - 1).toFixed(1)}° a ${(params.anguloVia + 1).toFixed(1)}°)`
+  );
+
+}
+
+linhaCampo("Latitude considerada:", `${params.latitudeGraus.toFixed(6)}°`);
+linhaCampo("Longitude considerada:", `${params.longitudeGraus.toFixed(6)}°`);
+linhaCampo("Aceleração da gravidade:", `${r.gravidadeLocalMs2.toFixed(6)} m/s²`);
+linhaCampo("Número de simulações:", "10.000");
+
+y += 4;
+
+
 
   titulo("3. Resultados");
 
@@ -377,43 +555,82 @@ function normalAleatorio(media, desvioPadrao) {
   return media + z * desvioPadrao;
 }
 
-
 function velocidadeMonteCarlo(params) {
+
   const g = gravidadeLatitude(params.latitudeGraus);
-
-  const miMin = Math.max(0, params.mi - params.desvioMi);
-  const miMax = params.mi + params.desvioMi;
-
-  const desvioMarca = 1;
-
   const n = 10000;
   const velocidades = [];
 
   for (let i = 0; i < n; i++) {
-    const miSorteado = miMin + Math.random() * (miMax - miMin);
 
-    let dSorteado = normalAleatorio(params.marca, desvioMarca);
+    // 1. Sorteia comprimento da marca
+    let dSorteado;
+
+    if (params.tipoMarca === "uniforme") {
+      dSorteado = params.marcaMin + Math.random() * (params.marcaMax - params.marcaMin);
+    } else {
+      dSorteado = normalAleatorio(params.marca, params.desvioMarca);
+    }
 
     if (dSorteado < 0) {
       dSorteado = 0;
     }
 
-    const v = Math.sqrt(2 * miSorteado * g * dSorteado);
+    // 2. Sorteia fator de arrasto
+    let miSorteado;
+
+    if (params.tipoFator === "uniforme") {
+      miSorteado = params.miMin + Math.random() * (params.miMax - params.miMin);
+    } else {
+      miSorteado = normalAleatorio(params.mi, params.desvioMi);
+    }
+
+    if (miSorteado < 0) {
+      miSorteado = 0;
+    }
+
+    // 3. Sorteia ângulo da topografia
+    const anguloGraus = sortearAnguloTopografia(params);
+    const theta = grausParaRad(Math.abs(anguloGraus));
+
+    // 4. Aplica correção de aclive/declive
+    let fatorTopografico;
+
+    if (params.tipoTopografia === "aclive") {
+      fatorTopografico = miSorteado * Math.cos(theta) + Math.sin(theta);
+    } else if (params.tipoTopografia === "declive") {
+      fatorTopografico = miSorteado * Math.cos(theta) - Math.sin(theta);
+    } else {
+      fatorTopografico = miSorteado;
+    }
+
+    if (fatorTopografico <= 0) {
+      continue;
+    }
+
+    // 5. Calcula velocidade
+    const v = Math.sqrt(2 * g * dSorteado * fatorTopografico);
 
     velocidades.push(v);
   }
 
   velocidades.sort((a, b) => a - b);
 
-  const media = velocidades.reduce((soma, v) => soma + v, 0) / n;
+  const nValido = velocidades.length;
+
+  if (nValido === 0) {
+    return null;
+  }
+
+  const media = velocidades.reduce((soma, v) => soma + v, 0) / nValido;
 
   const variancia =
-    velocidades.reduce((soma, v) => soma + (v - media) ** 2, 0) / (n - 1);
+    velocidades.reduce((soma, v) => soma + (v - media) ** 2, 0) / (nValido - 1);
 
   const desvioPadrao = Math.sqrt(variancia);
 
-  const p2_5 = velocidades[Math.floor(0.025 * n)];
-  const p97_5 = velocidades[Math.floor(0.975 * n)];
+  const p2_5 = velocidades[Math.floor(0.025 * nValido)];
+  const p97_5 = velocidades[Math.floor(0.975 * nValido)];
 
   return {
     velocidadeMaisProvavelMs: media,
@@ -423,7 +640,8 @@ function velocidadeMonteCarlo(params) {
     intervalo95Ms: [p2_5, p97_5],
     intervalo95Kmh: [p2_5 * 3.6, p97_5 * 3.6],
     gravidadeLocalMs2: g,
-    velocidades: velocidades
+    velocidades: velocidades,
+    simulacoesValidas: nValido
   };
 }
 
@@ -539,58 +757,117 @@ linhaVertical(
 }
 
 
-function valor(id) {
-  return parseFloat(document.getElementById(id).value);
-}
+
 
 function calcular() {
+
+  const tipoMarca = document.getElementById("tipoMarca").value;
+  const tipoFator = document.getElementById("tipoFator").value;
+  const tipoTopografia = document.getElementById("tipoTopografia").value;
+
   const params = {
-    marca: valor("marca"),
-    mi: valor("mi"),
-    desvioMi: valor("desvioMi"),
+    tipoMarca: tipoMarca,
+    tipoFator: tipoFator,
+    tipoTopografia: tipoTopografia,
+
     latitudeGraus: valor("latitude"),
-    longitudeGraus: valor("longitude")
+    longitudeGraus: valor("longitude"),
+
+    marca: document.getElementById("marca") ? valor("marca") : null,
+    desvioMarca: document.getElementById("desvioMarca") ? valor("desvioMarca") : null,
+    marcaMin: document.getElementById("marcaMin") ? valor("marcaMin") : null,
+    marcaMax: document.getElementById("marcaMax") ? valor("marcaMax") : null,
+
+    mi: document.getElementById("mi") ? valor("mi") : null,
+    desvioMi: document.getElementById("desvioMi") ? valor("desvioMi") : null,
+    miMin: document.getElementById("miMin") ? valor("miMin") : null,
+    miMax: document.getElementById("miMax") ? valor("miMax") : null,
+
+    anguloVia: document.getElementById("anguloVia") ? valor("anguloVia") : 0
   };
 
-  if (
-  isNaN(params.marca) ||
-  isNaN(params.mi) ||
-  isNaN(params.desvioMi) ||
-  isNaN(params.latitudeGraus)
-) {
-  document.getElementById("resultado").innerHTML =
-    "<p>Preencha corretamente todos os campos numéricos.</p>";
-  return;
-}
+  if (isNaN(params.latitudeGraus)) {
+    document.getElementById("resultado").innerHTML =
+      "<p>Preencha corretamente a latitude.</p>";
+    return;
+  }
+
+  if (tipoMarca === "normal") {
+    if (isNaN(params.marca) || isNaN(params.desvioMarca) || params.desvioMarca < 0) {
+      document.getElementById("resultado").innerHTML =
+        "<p>Preencha corretamente o comprimento da marca e seu desvio padrão.</p>";
+      return;
+    }
+  }
+
+  if (tipoMarca === "uniforme") {
+    if (
+      isNaN(params.marcaMin) ||
+      isNaN(params.marcaMax) ||
+      params.marcaMin < 0 ||
+      params.marcaMax <= params.marcaMin
+    ) {
+      document.getElementById("resultado").innerHTML =
+        "<p>Preencha corretamente os valores mínimo e máximo da marca de frenagem.</p>";
+      return;
+    }
+  }
+
+  if (tipoFator === "normal") {
+    if (isNaN(params.mi) || isNaN(params.desvioMi) || params.mi < 0 || params.desvioMi < 0) {
+      document.getElementById("resultado").innerHTML =
+        "<p>Preencha corretamente o fator de arrasto e seu desvio padrão.</p>";
+      return;
+    }
+  }
+
+  if (tipoFator === "uniforme") {
+    if (
+      isNaN(params.miMin) ||
+      isNaN(params.miMax) ||
+      params.miMin < 0 ||
+      params.miMax <= params.miMin
+    ) {
+      document.getElementById("resultado").innerHTML =
+        "<p>Preencha corretamente os valores mínimo e máximo do fator de arrasto.</p>";
+      return;
+    }
+  }
+
+  if (tipoTopografia !== "plana") {
+    if (isNaN(params.anguloVia) || params.anguloVia < 0) {
+      document.getElementById("resultado").innerHTML =
+        "<p>Preencha corretamente a inclinação média da via.</p>";
+      return;
+    }
+  }
 
   const r = velocidadeMonteCarlo(params);
 
   if (!r) {
-  document.getElementById("resultado").innerHTML =
-    "<p>Não foi possível calcular. Verifique o coeficiente de atrito e o desvio informado.</p>";
-  return;
-}
+    document.getElementById("resultado").innerHTML =
+      "<p>Não foi possível calcular. Verifique os parâmetros informados.</p>";
+    return;
+  }
 
   let html = `
-  <h3>Resultado por Monte Carlo</h3>
-  <p><strong>Velocidade mais provável:</strong> ${r.velocidadeMaisProvavelKmh.toFixed(2)} km/h</p>
-  <p><strong>Desvio padrão:</strong> ${r.desvioPadraoKmh.toFixed(2)} km/h</p>
-  <p><strong>Faixa contendo 95% das velocidades simuladas:</strong> ${r.intervalo95Kmh[0].toFixed(2)} km/h a ${r.intervalo95Kmh[1].toFixed(2)} km/h</p>
-  <p><strong>Gravidade local:</strong> ${r.gravidadeLocalMs2.toFixed(6)} m/s²</p>
-  <p><strong>Análise técnica:</strong> Considerando as hipóteses adotadas para os parâmetros de entrada e as 10.000 simulações de Monte Carlo, aproximadamente 95% das velocidades simuladas encontram-se compreendidas entre ${r.intervalo95Kmh[0].toFixed(2)} km/h e ${r.intervalo95Kmh[1].toFixed(2)} km/h, permanecendo cerca de 5% das simulações fora desse intervalo.</p>
-
+    <h3>Resultado por Monte Carlo</h3>
+    <p><strong>Velocidade mais provável:</strong> ${r.velocidadeMaisProvavelKmh.toFixed(2)} km/h</p>
+    <p><strong>Desvio padrão:</strong> ${r.desvioPadraoKmh.toFixed(2)} km/h</p>
+    <p><strong>Faixa contendo 95% das velocidades simuladas:</strong> 
+    ${r.intervalo95Kmh[0].toFixed(2)} km/h a ${r.intervalo95Kmh[1].toFixed(2)} km/h</p>
+    <p><strong>Gravidade local:</strong> ${r.gravidadeLocalMs2.toFixed(6)} m/s²</p>
+    <p><strong>Simulações válidas:</strong> ${r.simulacoesValidas}</p>
   `;
 
   document.getElementById("resultado").innerHTML = html;
 
   desenharHistograma(
-  r.velocidades,
-  r.velocidadeMaisProvavelMs,
-  r.intervalo95Ms[0],
-  r.intervalo95Ms[1]
-);
-
-
+    r.velocidades,
+    r.velocidadeMaisProvavelMs,
+    r.intervalo95Ms[0],
+    r.intervalo95Ms[1]
+  );
 }
 
 
