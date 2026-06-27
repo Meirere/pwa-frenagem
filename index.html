@@ -255,7 +255,7 @@ function gerarPDF() {
   titulo("1. Modelo matemático");
 
   paragrafo(
-    "A velocidade inicial do veículo foi estimada a partir do comprimento da marca de frenagem, empregando-se modelo físico baseado na Segunda Lei de Newton e no Princípio Trabalho-Energia."
+    "A velocidade inicial do veículo foi estimada a partir do comprimento da marca de frenagem, empregando-se modelo físico baseado na Segunda Lei de Newton e pelo Teorema da energia cinética."
   );
 
   paragrafo(
@@ -267,7 +267,7 @@ function gerarPDF() {
   verificarPagina(85);
 
   if (formulaImg && formulaImg.complete && formulaImg.naturalWidth > 0) {
-    doc.addImage(formulaImg, "PNG", 25, y, 160, 75);
+    doc.addImage(formulaImg, "PNG", 25, y, 80, 37.5);
     y += 82;
   } else {
     linha("V = √(2 × μ × g × d)");
@@ -284,24 +284,22 @@ function gerarPDF() {
 
   titulo("2. Dados utilizados no cálculo");
 
-  linha("Distribuição de probabilidade do fator de arrasto: uniforme");
-  linha(`Fator de arrasto mínimo: ${fatorMin.toFixed(3)}`);
-  linha(`Fator de arrasto máximo: ${fatorMax.toFixed(3)}`);
-  linha("Distribuição de probabilidade da marca de frenagem: uniforme");
-  linha(`Comprimento mínimo da marca: ${dMin.toFixed(2)} m`);
-  linha(`Comprimento máximo da marca: ${dMax.toFixed(2)} m`);
-  linha(`Latitude considerada: ${params.latitudeGraus.toFixed(6)} graus`);
-  linha(`Aceleração da gravidade: ${r.gravidadeLocalMs2.toFixed(6)} m/s²`);
-  linha("Número de simulações: 10.000");
+  linhaCampo("Distribuição de probabilidade do fator de arrasto:", "Uniforme");
+  linhaCampo("Fator de arrasto mínimo:", miMin.toFixed(3));
+  linhaCampo("Fator de arrasto máximo:", miMax.toFixed(3));
+  linhaCampo("Distribuição de probabilidade da marca de frenagem:", "Uniforme");
+  linhaCampo("Comprimento mínimo da marca:", `${dMin.toFixed(2)} m`);
+  linhaCampo("Comprimento máximo da marca:", `${dMax.toFixed(2)} m`);
+  linhaCampo("Latitude considerada:", `${params.latitudeGraus.toFixed(6)}°`);
+  linhaCampo("Aceleração da gravidade:", `${r.gravidadeLocalMs2.toFixed(6)} m/s²`);;
+  linhaCampo("Número de simulações:", "10.000");
   y += 4;
 
   titulo("3. Resultados");
 
-  linha(`Velocidade mais provável: ${r.velocidadeMaisProvavelKmh.toFixed(2)} km/h`);
-  linha(`Desvio padrão: ${r.desvioPadraoKmh.toFixed(2)} km/h`);
-  linha(
-    `Faixa contendo 95% das velocidades simuladas: ${r.intervalo95Kmh[0].toFixed(2)} km/h a ${r.intervalo95Kmh[1].toFixed(2)} km/h`
-  );
+  linhaCampo("Velocidade mais provável:", `${r.velocidadeMaisProvavelKmh.toFixed(2)} km/h`);
+  linhaCampo("Desvio padrão:", `${r.desvioPadraoKmh.toFixed(2)} km/h`);
+  linhaCampo( "Faixa contendo 95% das velocidades simuladas:", `${r.intervalo95Kmh[0].toFixed(2)} km/h a ${r.intervalo95Kmh[1].toFixed(2)} km/h`);
   y += 4;
 
   const canvas = document.getElementById("histograma");
@@ -404,7 +402,7 @@ function desenharHistograma(velocidades, media, limiteInferior, limiteSuperior) 
   const min = Math.min(...dados);
   const max = Math.max(...dados);
 
-  const classes = 60;
+  const classes = 30;
   const larguraClasse = (max - min) / classes;
   const frequencias = Array(classes).fill(0);
 
@@ -492,9 +490,16 @@ linhaVertical(
     "#d32f2f"          // vermelho
 );
 
+  ctx.save();
+
+  ctx.translate(20, margemSup + alturaGrafico / 2);
+  ctx.rotate(-Math.PI / 2);
+
+  ctx.textAlign = "center";
   ctx.fillStyle = "#000000";
-  ctx.fillText("Velocidade (km/h)", margemEsq + larguraGrafico / 2 - 60, canvas.height - 10);
-  ctx.fillText("Frequência", 10, margemSup + 10);
+  ctx.fillText("Frequência", 0, 0);
+
+  ctx.restore();
   
 }
 
